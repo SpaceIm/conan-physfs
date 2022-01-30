@@ -1,10 +1,11 @@
 from conans import ConanFile, CMake, tools
 import os
+import textwrap
 
 required_conan_version = ">=1.43.0"
 
 
-class PhysFSConan(ConanFile):
+class PhysfsConan(ConanFile):
     name = "physfs"
     description = (
         "PhysicsFS is a library to provide abstract access to various "
@@ -106,16 +107,47 @@ class PhysFSConan(ConanFile):
         self.copy("LICENSE.txt", dst="licenses", src=self._source_subfolder)
         cmake = self._configure_cmake()
         cmake.install()
-        # tools.rmdir(os.path.join(self.package_folder, "lib", "cmake"))
-        # tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
-        # tools.rmdir(os.path.join(self.package_folder, "share"))
+        tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
+
+        # TODO: to remove in conan v2 once cmake_find_package* generators removed
+        self._create_cmake_module_alias_targets(
+            os.path.join(self.package_folder, self._module_file_rel_path),
+            {self._physfs_target: "physfs::physfs"}
+        )
+
+    @staticmethod
+    def _create_cmake_module_alias_targets(module_file, targets):
+        content = ""
+        for alias, aliased in targets.items():
+            content += textwrap.dedent("""\
+                if(TARGET {aliased} AND NOT TARGET {alias})
+                    add_library({alias} INTERFACE IMPORTED)
+                    set_property(TARGET {alias} PROPERTY INTERFACE_LINK_LIBRARIES {aliased})
+                endif()
+            """.format(alias=alias, aliased=aliased))
+        tools.save(module_file, content)
+
+    @property
+    def _module_file_rel_path(self):
+        return os.path.join("lib", "cmake", "conan-official-{}-targets.cmake".format(self.name))
+
+    @property
+    def _physfs_target(self):
+        return "physfs" if self.options.shared else "physfs-static"
 
     def package_info(self):
-        target = "physfs" if self.options.shared else "physfs-static"
         self.cpp_info.set_property("cmake_file_name", "PhysFS")
-        self.cpp_info.set_property("cmake_target_name", target)
+        self.cpp_info.set_property("cmake_target_name", self._physfs_target)
         self.cpp_info.set_property("pkg_config_name", "physfs")
         suffix = "-static" if self._is_msvc and not self.options.shared else ""
         self.cpp_info.libs = ["physfs{}".format(suffix)]
         if self.settings.os in ["Linux", "FreeBSD"]:
             self.cpp_info.system_libs.append("pthread")
+        if self.options.shared:
+            self.cpp_info.defines.append("PHYSFS_SHARED")
+
+        # TODO: to remove in conan v2 once cmake_find_package* generators removed
+        self.cpp_info.filenames["cmake_find_package"] = "PhysFS"
+        self.cpp_info.filenames["cmake_find_package_multi"] = "PhysFS"
+        self.cpp_info.build_modules["cmake_find_package"] = [self._module_file_rel_path]
+        self.cpp_info.build_modules["cmake_find_package_multi"] = [self._module_file_rel_path]
