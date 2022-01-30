@@ -141,10 +141,13 @@ class PhysfsConan(ConanFile):
         self.cpp_info.set_property("pkg_config_name", "physfs")
         suffix = "-static" if self._is_msvc and not self.options.shared else ""
         self.cpp_info.libs = ["physfs{}".format(suffix)]
-        if self.settings.os in ["Linux", "FreeBSD"]:
-            self.cpp_info.system_libs.append("pthread")
         if self.options.shared:
             self.cpp_info.defines.append("PHYSFS_SHARED")
+        else:
+            if self.settings.os in ["Linux", "FreeBSD"]:
+                self.cpp_info.system_libs.append("pthread")
+            elif tools.is_apple_os(self.settings.os):
+                self.cpp_info.frameworks.extend(["Foundation", "IOKit"])
 
         # TODO: to remove in conan v2 once cmake_find_package* generators removed
         self.cpp_info.filenames["cmake_find_package"] = "PhysFS"
