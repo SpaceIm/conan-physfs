@@ -1,3 +1,5 @@
+see https://github.com/icculus/physfs/pull/15
+
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -171,6 +171,7 @@ endif()
